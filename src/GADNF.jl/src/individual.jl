@@ -4,6 +4,7 @@ const INVALID_FITNESS = -1.0
 const INVALID_COMPLEXITY = -1.0
 
 """
+    mutable struct Individual
 
 Each individual forms a tree of three levels. 
 The root node is called a disjunction node (DN). The child nodes of a DN are each called a conjunction node (CN).
@@ -11,12 +12,16 @@ The leaf node denotes a variable or its negation and is called a variable node (
 In this struct, each non-leaf node is defined as a vector that specifies the edges from it to nodes 
 in the next level.
 """
-struct Individual
+mutable struct Individual
     DN::Vector{Bool}        # 1: activate the CN, 0: deactivate the CN
     CNs::Matrix{Int8}       # each column is a CN, 1: x, -1:  not x, 0: unselected
 
     fitness::Float64        # ∈[0, 1]
     complexity::Float64     # ≥ 0
+
+    # the fields below are used as preallocated buffer to reduce memory allocations
+    ŷ::BitVector                    # the prediction result
+    regulator_selected::BitVector   # whether a regulator is selected
 end
 
 
@@ -26,12 +31,15 @@ get_num_conjunctions(ind::Individual) = size(ind.CNs, 2)
 """
     Individual(num_inputs::Int, num_conjunctions::Int) -> Individual
 
-Create a random individual.
+Create a random individual.`max_samples` indicates the maximum number of samples during training, 
+whose default value is 1000. This parameter is used to preallocate memory for speedup.
 """
 function Individual(num_inputs::Int, num_conjunctions::Int)
     cps = rand(Int8[-1, 0, 1], num_inputs, num_conjunctions)
     dp = rand(Bool, num_conjunctions)
-    return Individual(dp, cps, INVALID_FITNESS, INVALID_COMPLEXITY)
+    ŷ = BitVector()
+    regulator_selected = zeros(Bool, num_inputs)
+    return Individual(dp, cps, INVALID_FITNESS, INVALID_COMPLEXITY, ŷ, regulator_selected)
 end
 
 """
@@ -71,26 +79,34 @@ function to_expression(ind::Individual, feature_names::AbstractVector{String})
     return join(cp_strings, " | ")
 end
 
-
 """
-    select_regulators(ind::Individual, feature_names::AbstractVector{String}) -> Vector{String}
+    mark_selected_regulators!(ind::Individual) -> BitVector
 
-Get the list of regulators that have been chosen by `ind`.
+Mark the selected regulators in `ind` in place. The resultant selector vector is also returned.
 """
-function select_regulators(ind::Individual, feature_names::AbstractVector{String})
+function mark_selected_regulators!(ind::Individual)::BitVector
     @assert get_num_inputs(ind) == length(feature_names)
-    regulator_indices = Set{Int}()
+    fill!(ind.regulator_selected, false)
     for i in eachindex(ind.DN)
         if ind.DN[i]    # cp i is activated
             cp = @view ind.CNs[:, i]
             for j in eachindex(cp)
-                if cp[j] == 1 || cp[j] == -1
-                    push!(regulator_indices, j)
+                if cp[j] == 1 || cp[j] == -1   # C-edge j is activated
+                    ind.regulator_selected[j] = true
                 end
             end
         end
     end
-    return [feature_names[i] for i in regulator_indices]
+    return ind.regulator_selected
+end
+
+"""
+    get_selected_regulators(regulator_selected::AVB, feature_names::AbstractVector{String}) -> Vector{String}
+
+Given a selector `regulator_selected`, return the names of the selected regulators.
+"""
+function get_selected_regulators(regulator_selected::AVB, feature_names::AbstractVector{String})
+    return feature_names[regulator_selected]
 end
 
 """
