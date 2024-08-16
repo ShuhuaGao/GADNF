@@ -31,7 +31,7 @@ The individual in `new_population` is deeply copied and independent from that in
 function select_tournament!(new_population::AbstractVector{Individual}, old_population::AbstractVector{Individual}; 
         tournament_size=2)
     @assert tournament_size >= 2
-    if tournament_size== 2
+    if tournament_size == 2
         for i in eachindex(new_population)
             winner = select_tournament(old_population[rand(1:length(old_population))], old_population[rand(1:length(old_population))])
             copy!(new_population[i], winner)   # we need a deep copy

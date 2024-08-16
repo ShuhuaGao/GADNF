@@ -51,9 +51,7 @@ function run_GA(X::BitMatrix, y::BitVector; cfg::GAConfig, target::String="y",
     new_population = [Individual(num_inputs, cfg.num_conjunctions) for _ in 1:cfg.population_size]
     # evaluate initial population
     evaluate_fitness!.(population, Ref(X), Ref(y))
-    # initial rate parameter values
-    CN_subtree_cx_rate = cfg.CN_subtree_cx_rate
-    edge_cx_rate = cfg.edge_cx_rate
+
 
     @printf("%-5s %-8s %-8s\n", "Gen", "Error", "Complexity")
     function report(population, g)
@@ -77,13 +75,16 @@ function run_GA(X::BitMatrix, y::BitVector; cfg::GAConfig, target::String="y",
         mut_add_rate = 0.1
         # crossover
         for i in 1:2:cfg.population_size
-            crossover!(new_population[i], new_population[i+1]; CN_subtree_cx_rate, edge_cx_rate)
+            crossover!(new_population[i], new_population[i+1]; 
+                CN_subtree_cx_rate=cfg.CN_subtree_cx_rate, edge_cx_rate=cfg.edge_cx_rate)
         end
         # mutation
         # mutate!.(new_population; mut_reduce_rate, mut_add_rate)
         mutate2!.(new_population; mut_reduce_rate, mut_rate=cfg.mut_rate)
         # copy elites
-        select_elites!(@view(new_population[1:cfg.num_elites]), population)
+        if cfg.num_elites > 0
+            select_elites!(@view(new_population[1:cfg.num_elites]), population)
+        end
         # evaluate, but no need to evaluate the elites 
         evaluate_fitness!.(@view(new_population[cfg.num_elites+1:end]), Ref(X), Ref(y))
         new_population, population = population, new_population
