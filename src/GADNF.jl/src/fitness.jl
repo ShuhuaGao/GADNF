@@ -80,8 +80,10 @@ function count_complexity(ind::Individual)
             num_activated_c_edges += sum(abs, @view ind.CNs[:, i])
         end
     end
-    c_ratio = num_activated_c_edges / length(ind.CNs) 
-    return selected_ratio + d_ratio + c_ratio
+    c_ratio = num_activated_c_edges / length(ind.CNs)
+    # TODO  
+    # return selected_ratio + d_ratio + c_ratio
+    return selected_ratio
 end
 
 
@@ -90,6 +92,26 @@ function evaluate_fitness!(ind::Individual, X::BitMatrix, y::BitVector)
     ind.fitting_error_rate = num_errors / length(y)
     ind.complexity = count_complexity(ind)
     return nothing
+end
+
+
+function scale!(population::AbstractVector{Individual}, property::Symbol, scaled_property::Symbol)
+    min_v, max_v = extrema((getproperty(ind, property) for ind in population))
+    if max_v != min_v
+        k = 1 / (max_v - min_v)
+        b = 1 - k * max_v
+        for ind in population
+            setproperty!(ind, scaled_property, k * getproperty(ind, property) + b)
+        end
+    end
+end
+
+function evaluate_fitness!(population::AbstractVector{Individual}, X::BitMatrix, y::BitVector)
+    # evaluate the raw criteria first
+    evaluate_fitness!.(population, Ref(X), Ref(y))
+    # scale the two criteria
+    scale!(population, :fitting_error_rate, :scaled_fitting_error_rate)
+    scale!(population, :complexity, :scaled_complexity)
 end
 
 """
@@ -102,12 +124,19 @@ function get_fitness(ind::Individual)
     return ind.fitting_error_rate, ind.complexity
 end
 
+get_combined_fitness(ind::Individual) = 0.6*ind.scaled_complexity + 0.4*ind.scaled_fitting_error_rate
+
 
 # function Base.:<(ind1::Individual, ind2::Individual)
 #     return (ind1.fitting_error_rate, ind1.complexity) < (ind2.fitting_error_rate, ind2.complexity)
 # end
 
 function Base.isless(ind1::Individual, ind2::Individual)
-    return (ind1.fitting_error_rate, ind1.complexity) < (ind2.fitting_error_rate, ind2.complexity)
+    # return (ind1.fitting_error_rate, ind1.complexity) < (ind2.fitting_error_rate, ind2.complexity)
+    return get_combined_fitness(ind1) < get_combined_fitness(ind2)
 end
 
+
+function less_lex(ind1::Individual, ind2::Individual)
+    return (ind1.fitting_error_rate, ind1.complexity) < (ind2.fitting_error_rate, ind2.complexity)
+end

@@ -16,6 +16,6 @@ include("selection.jl")
 include("ga.jl")
 
 export Individual, run_GA, GAConfig, to_expression, to_simplified_expression, generate_bool_data,
-    get_fitness
+    get_fitness, run_CGA, compute_distance, less_lex
 
 end # module GADNF

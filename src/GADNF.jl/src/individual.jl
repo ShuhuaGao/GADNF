@@ -18,6 +18,8 @@ mutable struct Individual
 
     fitting_error_rate::Float64        # ∈[0, 1]
     complexity::Float64     # ≥ 0
+    scaled_fitting_error_rate::Float64        # ∈[0, 1]
+    scaled_complexity::Float64     # [0, 1]
 
     # the fields below are used as preallocated buffer to reduce memory allocations
     ŷ::BitVector                    # the prediction result
@@ -50,7 +52,8 @@ function Individual(num_inputs::Int, num_conjunctions::Int)
     dp = rand(Bool, num_conjunctions)
     ŷ = BitVector()
     regulator_selected = zeros(Bool, num_inputs)
-    return Individual(dp, cps, INVALID_FITNESS, INVALID_COMPLEXITY, ŷ, regulator_selected)
+    return Individual(dp, cps, INVALID_FITNESS, INVALID_COMPLEXITY, INVALID_FITNESS, INVALID_COMPLEXITY, 
+        ŷ, regulator_selected)
 end
 
 is_evaluated(ind::Individual) = ind.fitting_error_rate != INVALID_FITNESS && ind.complexity != INVALID_COMPLEXITY
